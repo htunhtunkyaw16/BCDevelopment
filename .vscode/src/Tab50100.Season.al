@@ -5,7 +5,7 @@ table 50100 Season
 {
     Caption = 'Season';
     DataClassification = ToBeClassified;
-    
+
     fields
     {
         field(1; "Season Code"; Code[10])

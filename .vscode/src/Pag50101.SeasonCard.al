@@ -6,7 +6,7 @@ page 50101 "Season Card"
     Caption = 'Season Card';
     PageType = Card;
     SourceTable = Season;
-    
+
     layout
     {
         area(content)

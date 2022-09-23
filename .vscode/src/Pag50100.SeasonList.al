@@ -3,10 +3,12 @@
 /// </summary>
 page 50100 "Season List"
 {
-    Caption = 'Season List';
+    Caption = 'Season';
     PageType = List;
     SourceTable = Season;
     CardPageId = 50101;
+    ApplicationArea = All;
+    UsageCategory = Lists;
 
     layout
     {
