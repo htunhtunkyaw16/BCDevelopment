@@ -21,7 +21,9 @@ page 50101 "Season Card"
 
                     trigger OnAssistEdit()
                     begin
+#pragma warning disable AL0604
                         if AssitEdit then
+#pragma warning restore AL0606
                             CurrPage.Update();
                     end;
                 }
