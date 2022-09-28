@@ -17,6 +17,13 @@ page 50101 "Season Card"
                 {
                     ApplicationArea = All;
                     ToolTip = 'Specifies the value of the Season Code field.';
+                    Importance = Standard;
+
+                    trigger OnAssistEdit()
+                    begin
+                        if AssitEdit then
+                            CurrPage.Update();
+                    end;
                 }
                 field(Description; Rec.Description)
                 {

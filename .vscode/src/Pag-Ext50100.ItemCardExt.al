@@ -79,5 +79,16 @@ pageextension 50100 ItemCardExt extends "Item Card"
                 }
             }
         }
+        modify("Vendor No.")
+        {
+            trigger OnAfterValidate()
+            var
+                Vendor: Record Vendor;
+            begin
+                if Vendor."No." = Rec."No." then
+                    Rec."Vendor Name" := Vendor.Name;
+                CurrPage.Update();
+            end;
+        }
     }
 }
