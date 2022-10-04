@@ -54,7 +54,8 @@ tableextension 50100 ItemTableExt extends Item
         field(50209; "Vendor Name"; Text[100])
         {
             Caption = 'Vendor Name';
-            DataClassification = ToBeClassified;
+            FieldClass = FlowField;
+            CalcFormula = lookup(Vendor.Name where("No." = field("Vendor No.")));
         }
         field(50210; Season; Code[10])
         {

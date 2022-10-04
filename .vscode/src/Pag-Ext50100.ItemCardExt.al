@@ -5,6 +5,14 @@ pageextension 50100 ItemCardExt extends "Item Card"
 {
     layout
     {
+        addafter("No.")
+        {
+            field("No. 2"; Rec."No. 2")
+            {
+                Caption = 'No. 2';
+                ApplicationArea = All;
+            }
+        }
         addafter(Warehouse)
         {
             group(Customization)
@@ -82,8 +90,6 @@ pageextension 50100 ItemCardExt extends "Item Card"
         modify("Vendor No.")
         {
             trigger OnAfterValidate()
-            var
-                Vendor: Record Vendor;
             begin
                 if Vendor."No." = Rec."No." then
                     Rec."Vendor Name" := Vendor.Name;
@@ -91,4 +97,7 @@ pageextension 50100 ItemCardExt extends "Item Card"
             end;
         }
     }
+
+    var
+        Vendor: Record Vendor;
 }
