@@ -12,6 +12,16 @@ pageextension 50100 ItemCardExt extends "Item Card"
                 Caption = 'No. 2';
                 ApplicationArea = All;
             }
+            field("Brand Code"; Rec."Brand Code")
+            {
+                Caption = 'Brand Code';
+                ApplicationArea = All;
+            }
+            field("Repair Item"; Rec."Repair Item")
+            {
+                Caption = 'Repair Item';
+                ApplicationArea = All;
+            }
         }
         addafter(Warehouse)
         {

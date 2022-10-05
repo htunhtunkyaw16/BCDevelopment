@@ -62,5 +62,16 @@ tableextension 50100 ItemTableExt extends Item
             Caption = 'Season';
             DataClassification = ToBeClassified;
         }
+        field(50211; "Brand Code"; Code[20])
+        {
+            Caption = 'Brand Code';
+            DataClassification = ToBeClassified;
+            TableRelation = "Dimension Value".Code where("Global Dimension No." = const(2));
+        }
+        field(50212; "Repair Item"; Boolean)
+        {
+            Caption = 'Rapair Item';
+            DataClassification = ToBeClassified;
+        }
     }
 }
