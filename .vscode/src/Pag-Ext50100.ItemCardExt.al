@@ -93,7 +93,6 @@ pageextension 50100 ItemCardExt extends "Item Card"
                 {
                     ApplicationArea = All;
                     Caption = 'Season';
-                    TableRelation = Season."Season Code";
                 }
             }
         }
