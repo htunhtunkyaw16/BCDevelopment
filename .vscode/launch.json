@@ -7,7 +7,7 @@
             "type": "al",
             "environmentType": "OnPrem",
             "server": "http://localhost",
-            "serverInstance": "BC200",
+            "serverInstance": "BC210",
             "authentication": "UserPassword",
             //"schemaUpdateMode": "Recreate",
             "startupObjectId": 22,

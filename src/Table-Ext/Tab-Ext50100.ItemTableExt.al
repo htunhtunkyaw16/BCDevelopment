@@ -61,7 +61,7 @@ tableextension 50100 ItemTableExt extends Item
         {
             Caption = 'Season';
             DataClassification = ToBeClassified;
-            TableRelation = Season."Season Code";
+            TableRelation = Season;
         }
         field(50211; "Brand Code"; Code[20])
         {
