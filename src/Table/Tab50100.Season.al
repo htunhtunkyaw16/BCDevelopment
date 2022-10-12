@@ -70,6 +70,7 @@ table 50100 Season
     var
         CusFieldSetup: Record CustomFieldSetUp;
         NoSeriesMgt: Codeunit NoSeriesManagement;
+        sales: Record "Price List Header";
 
     /// <summary>
     /// AssitEdit.

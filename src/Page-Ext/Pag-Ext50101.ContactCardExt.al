@@ -15,9 +15,9 @@ pageextension 50101 ContactCardExt extends "Contact Card"
 
                 trigger OnAssistEdit()
                 begin
-#pragma warning disable AL0604
+#pragma warning disable
                     if DWAssistEdit(xRec) then
-#pragma warning restore AL0606
+#pragma warning restore 
                         CurrPage.Update();
                 end;
             }
