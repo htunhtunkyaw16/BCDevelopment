@@ -17,10 +17,10 @@ page 50102 CustomFieldsSetup
         {
             group(General)
             {
-                field("DW Id"; Rec."DW Id")
+                field("External Id"; Rec."External Id")
                 {
                     ApplicationArea = Basic, Suite;
-                    ToolTip = 'Specifies the code for the number series to use when assigning numbers to DynaicWeb User Id.';
+                    ToolTip = 'Specifies the code for the number series to use when assigning numbers to External Id.';
                 }
                 field("Season No"; Rec."Season No")
                 {

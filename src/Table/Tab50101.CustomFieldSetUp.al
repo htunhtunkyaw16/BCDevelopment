@@ -13,9 +13,9 @@ table 50101 CustomFieldSetUp
             Caption = 'Primary Key';
             DataClassification = ToBeClassified;
         }
-        field(2; "DW Id"; Code[20])
+        field(2; "External Id"; Code[20])
         {
-            Caption = 'DW Id';
+            Caption = 'EXternal Id';
             DataClassification = ToBeClassified;
             TableRelation = "No. Series";
         }

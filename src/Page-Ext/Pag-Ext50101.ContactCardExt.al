@@ -7,17 +7,15 @@ pageextension 50101 ContactCardExt extends "Contact Card"
     {
         addafter("No.")
         {
-            field(DWUserId; Rec.DWUserId)
+            field("External ID";Rec."External ID")
             {
                 ApplicationArea = All;
-                Caption = 'DW User ID';
+                Caption = 'External ID';
                 Importance = Standard;
 
                 trigger OnAssistEdit()
                 begin
-#pragma warning disable
-                    if DWAssistEdit(xRec) then
-#pragma warning restore 
+                    if Rec.ExternalAssistEdit(xRec) then
                         CurrPage.Update();
                 end;
             }
