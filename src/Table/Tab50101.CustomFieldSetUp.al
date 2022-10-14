@@ -15,7 +15,7 @@ table 50101 CustomFieldSetUp
         }
         field(2; "External Id"; Code[20])
         {
-            Caption = 'EXternal Id';
+            Caption = 'External Id';
             DataClassification = ToBeClassified;
             TableRelation = "No. Series";
         }
