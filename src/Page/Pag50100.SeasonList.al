@@ -36,6 +36,7 @@ page 50100 "Season List"
                     ApplicationArea = All;
                     ToolTip = 'Specifies the value of the Ending Date field.';
                 }
+                
             }
         }
     }
