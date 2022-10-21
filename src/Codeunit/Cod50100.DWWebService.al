@@ -32,73 +32,110 @@ codeunit 50100 DW_WebService
         XMLCurrNode: XmlNode;
         XMLdocOut: XmlDocument;
         XMLFilterNode: XmlNodeList;
+        XMLItemFilterNode: XmlNodeList;
+        XMLCustFilterNode: XmlNodeList;
     begin
         XMLdocOut := XmlDocument.Create();
         AddDeclaration(XMLdocOut, '1.0', 'utf-16', 'yes');
         XMLCurrNode := XmlElement.Create('tables').AsXmlNode();
 
-        if (Get_TextFromNode(XMLdocIn.AsXmlNode(), '/GetEcomData/@SalesCode') <> '') then begin
+        if ((Get_TextFromNode(XMLdocIn.AsXmlNode(), '/GetEcomData/@ExternalUserId') <> '') or (Get_TextFromNode(XMLdocIn.AsXmlNode(), '/GetEcomData/@SalesCode') <> '')) then begin
             if (Get_TextFromNode(XMLdocIn.AsXmlNode(), '/GetEcomData/tables/SalesPrices/@type') = 'all') then
-                Add_EcomSalesPrices(XMLCurrNode, true, XMLFilterNode);
-            if (Get_TextFromNode(XMLdocIn.AsXmlNode(), '/GetEcomData/tables/SalesPrices/@type') = 'filter') then begin
-                XMLdocIn.AsXmlNode().SelectNodes('/GetEcomData/tables/SalesPrices/SalesCode', XMLFilterNode);
-                Add_EcomSalesPrices(XMLCurrNode, false, XMLFilterNode);
-            end;
+                //XMLdocIn.AsXmlNode().SelectNodes('/GetEcomData/@ExternalUserId', XMLCustFilterNode);
+                //XMLdocIn.AsXmlNode().SelectNodes('/GetEcomData/tables/SalesPrices/Product', XMLItemFilterNode);
+                Add_EcomSalesPrices(XMLCurrNode, XMLFilterNode, copystr(Get_TextFromNode(XMLdocIn.AsXmlNode(), '/GetEcomData/@ExternalUserId'), 1, 20), copystr(Get_TextFromNode(XMLdocIn.AsXmlNode(), '/GetEcomData/@SalesCode'), 1, 20));
         end
         else begin
             if (Get_TextFromNode(XMLdocIn.AsXmlNode(), '/GetEcomData/tables/Season/@type') = 'all') then
                 Add_SeasonXML(XMLCurrNode, true, XMLFilterNode);
+            if (Get_TextFromNode(XMLdocIn.AsXmlNode(), '/GetEcomData/tables/Season/@type') = 'filter') then begin
+                XMLdocIn.AsXmlNode().SelectNodes('/GetEcomData/tables/Season/SeasonCode', XMLFilterNode);
+                Add_SeasonXML(XMLCurrNode, false, XMLFilterNode);
+            end;
         end;
 
         XMLdocOut.Add(XMLCurrNode);
         ConvertXmlToBigText(XMLdocOut, Request);
     end;
 
-    local procedure Add_EcomSalesPrices(XMLCurrNode: XmlNode; GetAll: Boolean; FilterNodes: XmlNodeList)
+    local procedure Add_EcomSalesPrices(var XMLCurrNode: XmlNode; XMLFilterNode: XmlNodeList; CustomerNo: Code[20]; SalesCode: Code[20])
     var
         SalesPrice: Record "Price List Line";
+        tempSalesPrice: Record "Price List Line" temporary;
+        Customer: Record Customer;
+        tempCust: Record Customer temporary;
         XMLNewChild: XmlNode;
         xmlElement: XmlElement;
-        FilterNode: XmlNode;
-        i: Integer;
     begin
-        Add_Element(XMLCurrNode, 'table', '', '', XMLNewChild, '');
-        Add_Attribute(XMLNewChild, 'tableName', 'EcomSalesPrice');
+        tempCust.DeleteAll();
+        tempSalesPrice.DeleteAll();
         Clear(SalesPrice);
 
-        if GetAll = false then begin
-            for i := 1 to FilterNodes.Count() do begin
-                FilterNodes.Get(i, FilterNode);
-                if SalesPrice.Get(FilterNode.AsXmlElement().InnerText()) then
-                    SalesPrice.Mark(true)
-                else
-                    Error(StrSubstNo('Sales price not found %1', FilterNode.AsXmlElement().InnerText()))
+        if CustomerNo <> '' then
+            if not tempCust.Get(CustomerNo) then begin
+                if not Customer.Get(CustomerNo) then
+                    Error(StrSubstNo('Customer not found %1', CustomerNo));
+                tempCust.Init();
+                tempCust."No." := CustomerNo;
+                tempCust.Insert();
             end;
-            SalesPrice.MarkedOnly(true);
-        end;
 
-        if SalesPrice.FindSet(false, false) then
+        if CustomerNo <> '' then begin
+            if tempCust.FindSet(false, false) then
+                repeat
+                    Customer.Get(tempCust."No.");
+                    SalesPrice.Reset();
+
+                    if SalesCode <> '' then
+                        SalesPrice.SetRange(SalesPrice."Price List Code", SalesCode);
+                    SalesPrice.SetRange("Source No.", tempCust."No.");
+                    if SalesPrice.FindSet(false, false) then
+                        repeat
+                            tempSalesPrice := SalesPrice;
+                            tempSalesPrice.Insert();
+                        until SalesPrice.Next() = 0;
+                until tempCust.Next() = 0;
+        end
+        else
+            if SalesCode <> '' then begin
+                SalesPrice.Reset();
+
+                SalesPrice.SetRange(SalesPrice."Price List Code", SalesCode);
+                if SalesPrice.FindSet(false, false) then
+                    repeat
+                        tempSalesPrice := SalesPrice;
+                        tempSalesPrice.Insert();
+                    until SalesPrice.Next() = 0;
+            end;
+
+        Add_Element(XMLCurrNode, 'table', '', '', XMLNewChild, '');
+        Add_Attribute(XMLNewChild, 'tableName', 'EcomSalesPrice');
+
+        GLSetup.Get();
+        if tempSalesPrice.FindSet(false, false) then
             repeat
                 Add_Element(XMLNewChild, 'item', '', '', XMLNewChild, '');
                 Add_Attribute(XMLNewChild, 'table', 'EcomSalesPrice');
 
-                Add_Field(XMLNewChild, 'Code', SalesPrice."Price List Code");
-                Add_Field(XMLNewChild, 'ProductId', SalesPrice."Asset No.");
-                Add_Field(XMLNewChild, 'ProductNumber', SalesPrice."Asset No.");
-                if SalesPrice."Currency Code" = '' then
-                    SalesPrice."Currency Code" := GLSetup."LCY Code";
-                Add_Field(XMLNewChild, 'ProductPriceCurrency', SalesPrice."Currency Code");
-                Add_Field(XMLNewChild, 'ProductUOM', SalesPrice."Unit of Measure Code");
-                Add_Field(XMLNewChild, 'ProductPriceMinimumQuantity', FORMAT(SalesPrice."Minimum Quantity"));
-                Add_Field(XMLNewChild, 'ProductPrice', FORMAT(SalesPrice."Unit Price"));
-                if SalesPrice."Price Includes VAT" then
+                Add_Field(XMLNewChild, 'ExternalUserId', tempSalesPrice."Source No.");
+                Add_Field(XMLNewChild, 'SalesCode', tempSalesPrice."Price List Code");
+                Add_Field(XMLNewChild, 'ProductId', tempSalesPrice."Asset No.");
+                Add_Field(XMLNewChild, 'ProductName', tempSalesPrice.Description);
+                if tempSalesPrice."Currency Code" = '' then
+                    tempSalesPrice."Currency Code" := GLSetup."LCY Code";
+                Add_Field(XMLNewChild, 'ProductPriceCurrency', tempSalesPrice."Currency Code");
+                Add_Field(XMLNewChild, 'ProductUOM', tempSalesPrice."Unit of Measure Code");
+                Add_Field(XMLNewChild, 'ProductPriceMinimumQuantity', FORMAT(tempSalesPrice."Minimum Quantity"));
+                Add_Field(XMLNewChild, 'ProductPrice', FORMAT(tempSalesPrice."Unit Price"));
+                if tempSalesPrice."Price Includes VAT" then
                     Add_Field(XMLNewChild, 'ProductGSTIncluded', 'True')
                 else
                     Add_Field(XMLNewChild, 'ProductGSTIncluded', 'False');
 
                 XMLNewChild.GetParent(xmlElement);
                 XMLNewChild := xmlElement.AsXmlNode();
-            until SalesPrice.Next() = 0;
+                TempSalesPrice."Currency Code" := '';
+            until tempSalesPrice.Next() = 0;
     end;
 
     local procedure Add_SeasonXML(XMLCurrNode: XmlNode; GetAll: Boolean; FilterNodes: XmlNodeList)
@@ -166,7 +203,7 @@ codeunit 50100 DW_WebService
     local procedure Get_TextFromNode(XMLnode: XmlNode; xpath: Text[1024]): Text
     begin
         if XMLnode.SelectSingleNode(xpath, XMLnode) then
-            IF XMLnode.IsXmlAttribute() then
+            if XMLnode.IsXmlAttribute() then
                 exit(XMLnode.AsXmlAttribute().Value())
             else
                 if XMLnode.IsXmlElement() then
@@ -210,6 +247,14 @@ codeunit 50100 DW_WebService
     begin
         cdata := XmlCData.Create(NodeText);
         XMLNode.AsXmlElement().Add(cdata);
+    end;
+
+    local procedure Get_SingleNodevalue(xmlnode: XmlNode; id: text): Text
+    var
+        datanode: XmlNode;
+    begin
+        xmlnode.AsXmlElement().SelectSingleNode(id, datanode);
+        exit(datanode.AsXmlElement().InnerText());
     end;
 
     local procedure SetNormalCase()
