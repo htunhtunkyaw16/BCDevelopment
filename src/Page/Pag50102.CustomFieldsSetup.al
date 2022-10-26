@@ -27,6 +27,11 @@ page 50102 CustomFieldsSetup
                     ApplicationArea = Basic, Suite;
                     ToolTip = 'Specifies the code for the number series to use when assigning numbers to season.';
                 }
+                field("Default Location Code"; Rec."Default Location Code")
+                {
+                    ApplicationArea = Basic, Suite;
+                    ToolTip = 'Specifies the code for the default location to use when assigning location to create order.';
+                }
             }
         }
     }

@@ -1,11 +1,17 @@
 /// <summary>
 /// Codeunit DW_WebService (ID 50100).
 /// </summary>
-codeunit 50100 DW_WebService
+codeunit 50100 HtunWebService
 {
     var
         NormalCaseMode: Boolean;
         GLSetup: Record "General Ledger Setup";
+        CreateOrder: Boolean;
+        Setup: Record CustomFieldSetUp;
+        HasSetup: Boolean;
+        Text003_Lbl: Label '%1 %2';
+        Text004_Lbl: Label '%1|%2';
+        Text005_Lbl: Label '''''';
 
     /// <summary>
     /// Process.
@@ -22,6 +28,8 @@ codeunit 50100 DW_WebService
         case xmlElement.LocalName() of
             'GetEcomData':
                 GetEcomData(Request, XMLdocIn);
+            'CalculateOrder':
+                APAC_PutEcomOrdersLive(Request, XMLdocIn);
             else
                 Error(StrSubstNo('Method %1 not found', xmlElement.LocalName()));
         end;
@@ -174,6 +182,51 @@ codeunit 50100 DW_WebService
             until Season.Next() = 0;
     end;
 
+    local procedure APAC_PutEcomOrdersLive(var Request: Text; XMLdocIn: XmlDocument)
+    var
+        salesheader: Record "Sales Header";
+        salesline: Record "Sales Line";
+        VATPostingSetup: Record "VAT Posting Setup";
+        customer: Record "Customer";
+        item: Record "Item";
+        T5054: Record "Contact Business Relation";
+        T5050: Record "Contact";
+        Contact: Record Contact;
+        ItemLackStock: Record "Item" temporary;
+        Cust: Record "Customer";
+        CustTemplate: Record "Customer Templ.";
+        ShippingMethod: Record "Shipment Method";
+        PaymentMethod: Record "Payment Method";
+        DefaultDim: Record "Default Dimension";
+        DefaultDim2: Record "Default Dimension";
+        Shipto: Record "Ship-to Address";
+        ItemUOM: Record "Item Unit of Measure";
+        CurrExchRate: Record "Currency Exchange Rate";
+        XMLNodeList: XmlNodeList;
+        XMLNodeListLines: XmlNodeList;
+        XMLElement2: XmlElement;
+        i: Integer;
+        u: Integer;
+        XMLNode: XmlNode;
+        XMLdocOut: XmlDocument;
+        XMLCurrNode: XmlNode;
+        XMLNewChild: XmlNode;
+        lineno: Integer;
+        Discount: Decimal;
+        Total: Decimal;
+        XMLStockNodeListLines: XmlNodeList;
+        XMLStockNode: XmlNode;
+        OrderShippingFee: Decimal;
+        OrderShippingFeeWGST: Decimal;
+        ChangeAddress: Boolean;
+        LocationFilter: Text[1024];
+        CreateCustmer_: Boolean;
+        CreateContact: Boolean;
+        UseExternaID: Boolean;
+    begin
+        
+    end;
+
     /// <summary>
     /// AddDeclaration.
     /// </summary>
@@ -211,6 +264,14 @@ codeunit 50100 DW_WebService
                 else
                     exit('');
         exit('');
+    end;
+
+    local procedure Get_DecimalFromNode(XMLnode: XmlNode; xpath: Text[1024]): Decimal
+    var
+        tempdecimal: Decimal;
+    begin
+        if not Evaluate(tempdecimal, Get_TextFromNode(XMLnode, xpath)) then exit(0);
+        exit(tempdecimal);
     end;
 
     local procedure Add_Element(var XMLNode: XmlNode; NodeName: Text[250]; NodeText: Text; NameSpace: Text[1000]; var CreatedXMLNode: XmlNode; prefix: Text[30])
@@ -260,5 +321,24 @@ codeunit 50100 DW_WebService
     local procedure SetNormalCase()
     begin
         NormalCaseMode := true;
+    end;
+
+    local procedure GetLocationFilter() LocationFilter: Text[1024]
+    var
+        lLocation: Record "Location";
+    begin
+        Clear(LocationFilter);
+        GetSetup();
+        if Setup."Default Location Code" <> '' then
+            LocationFilter := Setup."Default Location Code"
+        else
+            LocationFilter := Text005_Lbl;
+        lLocation.Reset();
+    end;
+
+    local procedure GetSetup()
+    begin
+        if not HasSetup then Setup.GET();
+        HasSetup := true;
     end;
 }
