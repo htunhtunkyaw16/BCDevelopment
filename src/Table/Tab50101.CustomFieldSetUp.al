@@ -31,6 +31,12 @@ table 50101 CustomFieldSetUp
             DataClassification = CustomerContent;
             TableRelation = Location;
         }
+        field(5; "Default Shipping Service"; Code[20])
+        {
+            Caption = 'Default Shipping Service';
+            DataClassification = CustomerContent;
+            TableRelation = Item where(Type = filter(Service));
+        }
     }
     keys
     {

@@ -17,6 +17,18 @@ page 50102 CustomFieldsSetup
         {
             group(General)
             {
+                field("Default Location Code"; Rec."Default Location Code")
+                {
+                    ApplicationArea = Basic, Suite;
+                    ToolTip = 'Specifies the code for the default location to use when assigning location to create order.';
+                }
+                field("Default Shipping Service"; Rec."Default Shipping Service")
+                {
+                    ApplicationArea = Basic, Suite;
+                }
+            }
+            group("No Series.")
+            {
                 field("External Id"; Rec."External Id")
                 {
                     ApplicationArea = Basic, Suite;
@@ -26,11 +38,6 @@ page 50102 CustomFieldsSetup
                 {
                     ApplicationArea = Basic, Suite;
                     ToolTip = 'Specifies the code for the number series to use when assigning numbers to season.';
-                }
-                field("Default Location Code"; Rec."Default Location Code")
-                {
-                    ApplicationArea = Basic, Suite;
-                    ToolTip = 'Specifies the code for the default location to use when assigning location to create order.';
                 }
             }
         }
