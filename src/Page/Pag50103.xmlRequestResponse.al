@@ -37,7 +37,7 @@ page 50103 xmlRequestResponse
 
                 trigger OnAction()
                 var
-                    webService: Codeunit DW_WebService;
+                    webService: Codeunit HtunWebService;
                     response: Text;
                 begin
                     response := request;

@@ -25,6 +25,18 @@ table 50101 CustomFieldSetUp
             DataClassification = ToBeClassified;
             TableRelation = "No. Series";
         }
+        field(4; "Default Location Code"; Code[20])
+        {
+            Caption = 'Default Location Code';
+            DataClassification = CustomerContent;
+            TableRelation = Location;
+        }
+        field(5; "Default Shipping Service"; Code[20])
+        {
+            Caption = 'Default Shipping Service';
+            DataClassification = CustomerContent;
+            TableRelation = Item where(Type = filter(Service));
+        }
     }
     keys
     {
