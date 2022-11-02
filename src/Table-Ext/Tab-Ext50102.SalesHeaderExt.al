@@ -82,15 +82,4 @@ tableextension 50102 SalesHeaderExt extends "Sales Header"
         "Ship-to Phone No" := ShipToPhone;
     end;
 
-    local procedure SetCustomerLocationCode(SellToCustomer: Record Customer)
-    var
-        IsHandled: Boolean;
-    begin
-        IsHandled := false;
-        if IsHandled then
-            exit;
-
-        if SellToCustomer."Location Code" <> '' then
-            Validate("Location Code", SellToCustomer."Location Code");
-    end;
 }
