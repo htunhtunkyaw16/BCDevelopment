@@ -13,7 +13,7 @@ pageextension 50103 SalesOrdersExt extends "Sales Order"
                 Caption = 'E-mail';
                 Editable = ShipToOptions = ShipToOptions::"Custom Address";
                 QuickEntry = false;
-                ToolTip = 'Specifies additional address information.';
+                ToolTip = 'Specifies ship to email address information.';
             }
             field("Ship-to Phone No"; Rec."Ship-to Phone No")
             {
@@ -21,7 +21,7 @@ pageextension 50103 SalesOrdersExt extends "Sales Order"
                 Caption = 'Phone No.';
                 Editable = ShipToOptions = ShipToOptions::"Custom Address";
                 QuickEntry = false;
-                ToolTip = 'Specifies additional address information.';
+                ToolTip = 'Specifies phone no information.';
             }
         }
         modify(ShippingOptions)
