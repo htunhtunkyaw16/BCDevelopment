@@ -8,18 +8,23 @@ codeunit 50100 HtunWebService
         SalesSetup: Record "Sales & Receivables Setup";
         GLSetup: Record "General Ledger Setup";
         Currency: Record "Currency";
+        ItemCategory: Record "Item Category";
+        ContactBusRela: Record "Contact Business Relation";
+        Personcontact: Record "Contact";
         NormalCaseMode: Boolean;
+        FoundSalesPrice: Boolean;
         AllowLineDisc: Boolean;
         AllowInvDisc: Boolean;
         QtyPerUOM: Decimal;
         Qty: Decimal;
         Text002_Lbl: Label 'Prices including VAT cannot be calculated when %1 is %2.';
-        VATCalcType: Enum "Tax Calculation Type";
+        VATCalcType: Enum "Tax Calculation Type";// Option "Normal VAT","Reverse Charge VAT","Full VAT","Sales Tax";
         PricesInclVAT: Boolean;
         VATBusPostingGr: Code[10];
         VATPerCent: Decimal;
         PricesInCurrency: Boolean;
         ExchRateDate: Date;
+        LineDiscPerCent: Decimal;
         CurrencyFactor: Decimal;
         Order_OrderPriceWithVAT: Decimal;
         Order_OrderPriceWithoutVAT: Decimal;
@@ -39,6 +44,8 @@ codeunit 50100 HtunWebService
         Text003_Lbl: Label '%1 %2';
         Text004_Lbl: Label '%1|%2';
         Text005_Lbl: Label '''''';
+        gLocationFilter: text;
+        gCountrySetup: code[20];
 
     /// <summary>
     /// Process.
@@ -48,6 +55,10 @@ codeunit 50100 HtunWebService
     var
         XMLdocIn: XmlDocument;
         xmlElement: XmlElement;
+        requestAmount: Integer;
+        FirstItem: Integer;
+        customerid: Code[20];
+        ReportUsage: Enum "Report Selection Usage";
     begin
         ConvertBigTestToXml(XMLdocIn, Request);
         XMLdocIn.GetRoot(xmlElement);
@@ -62,6 +73,21 @@ codeunit 50100 HtunWebService
         end;
     end;
 
+    /// <summary>
+    /// AddDeclaration.
+    /// </summary>
+    /// <param name="pXMLDocument">VAR XmlDocument.</param>
+    /// <param name="pVersion">Text.</param>
+    /// <param name="pEncoding">Text.</param>
+    /// <param name="pStandalone">Text.</param>
+    Local procedure AddDeclaration(var pXMLDocument: XmlDocument; pVersion: Text; pEncoding: Text; pStandalone: Text)
+    var
+        lXmlDeclaration: XmlDeclaration;
+    begin
+        lXmlDeclaration := XmlDeclaration.Create(pVersion, pEncoding, pStandalone);
+        pXMLDocument.SetDeclaration(lXmlDeclaration);
+    end;
+
     local procedure GetEcomData(var Request: Text; XMLdocIn: XmlDocument)
     var
         XMLCurrNode: XmlNode;
@@ -74,13 +100,24 @@ codeunit 50100 HtunWebService
         AddDeclaration(XMLdocOut, '1.0', 'utf-16', 'yes');
         XMLCurrNode := XmlElement.Create('tables').AsXmlNode();
 
-        if ((Get_TextFromNode(XMLdocIn.AsXmlNode(), '/GetEcomData/@ExternalUserId') <> '') or (Get_TextFromNode(XMLdocIn.AsXmlNode(), '/GetEcomData/@SalesCode') <> '')) then begin
-            if (Get_TextFromNode(XMLdocIn.AsXmlNode(), '/GetEcomData/tables/SalesPrices/@type') = 'all') then
-                //XMLdocIn.AsXmlNode().SelectNodes('/GetEcomData/@ExternalUserId', XMLCustFilterNode);
-                //XMLdocIn.AsXmlNode().SelectNodes('/GetEcomData/tables/SalesPrices/Product', XMLItemFilterNode);
-                Add_EcomSalesPrices(XMLCurrNode, XMLFilterNode, copystr(Get_TextFromNode(XMLdocIn.AsXmlNode(), '/GetEcomData/@ExternalUserId'), 1, 20), copystr(Get_TextFromNode(XMLdocIn.AsXmlNode(), '/GetEcomData/@SalesCode'), 1, 20));
+        if ((Get_TextFromNode(XMLdocIn.AsXmlNode(), '/GetEcomData/@ExternalUserID') <> '') or (Get_TextFromNode(XMLdocIn.AsXmlNode(), '/GetEcomData/@SalesCode') <> '')) then begin
+            //product list for one customer
+            if (Get_TextFromNode(XMLdocIn.AsXmlNode(), '/GetEcomData/tables/Products/@type') = 'all') then
+                Add_EcomProductsCustomer(XMLCurrNode, true, Get_TextFromNode(XMLdocIn.AsXmlNode(), '/GetEcomData/@ExternalUserID'), XMLFilterNode);
+            if (Get_TextFromNode(XMLdocIn.AsXmlNode(), '/GetEcomData/tables/Products/@type') = 'filter') then begin
+                XMLdocIn.AsXmlNode().SelectNodes('/GetEcomData/tables/Products/Product', XMLFilterNode);
+                Add_EcomProductsCustomer(XMLCurrNode, false, Get_TextFromNode(XMLdocIn.AsXmlNode(), '/GetEcomData/@ExternalUserID'), XMLFilterNode);
+            end;
+
+            //sales price for one customer
+            if (Get_TextFromNode(XMLdocIn.AsXmlNode(), '/GetEcomData/tables/SalesPrices/@type') = 'all') then begin
+                XMLdocIn.AsXmlNode().SelectNodes('/GetEcomData/@ExternalUserID', XMLCustFilterNode);
+                XMLdocIn.AsXmlNode().SelectNodes('/GetEcomData/tables/SalesPrices/Product', XMLItemFilterNode);
+                Add_EcomSalesPrices(XMLCurrNode, true, XMLCustFilterNode, XMLItemFilterNode, CopyStr(Get_TextFromNode(XMLdocIn.AsXmlNode(), '/GetEcomData/@ExternalUserID'), 1, 20), CopyStr(Get_TextFromNode(XMLdocIn.AsXmlNode(), '/GetEcomData/@SalesCode'), 1, 20));
+            end
         end
         else begin
+            //Season list
             if (Get_TextFromNode(XMLdocIn.AsXmlNode(), '/GetEcomData/tables/Season/@type') = 'all') then
                 Add_SeasonXML(XMLCurrNode, true, XMLFilterNode);
             if (Get_TextFromNode(XMLdocIn.AsXmlNode(), '/GetEcomData/tables/Season/@type') = 'filter') then begin
@@ -93,18 +130,212 @@ codeunit 50100 HtunWebService
         ConvertXmlToBigText(XMLdocOut, Request);
     end;
 
-    local procedure Add_EcomSalesPrices(var XMLCurrNode: XmlNode; XMLFilterNode: XmlNodeList; CustomerNo: Code[20]; SalesCode: Code[20])
+    local procedure Add_EcomProductsCustomer(var XMLCurrNode: XmlNode; GetAll: Boolean; CustomerNo: Text; FilterNodes: XmlNodeList)
     var
-        SalesPrice: Record "Price List Line";
-        tempSalesPrice: Record "Price List Line" temporary;
-        Customer: Record Customer;
-        tempCust: Record Customer temporary;
+        item: Record "Item";
+        customer: Record "Customer";
+        CurrExchRate: Record "Currency Exchange Rate";
         XMLNewChild: XmlNode;
-        xmlElement: XmlElement;
+        FilteredNode: XmlNode;
+        i: Integer;
     begin
+        Add_Element(XMLCurrNode, 'table', '', '', XMLNewChild, '');
+        Add_Attribute(XMLNewChild, 'tableName', 'EcomProducts');
+
+        Clear(item);
+        Clear(customer);
+        Clear(Currency);
+        customer.Get(CustomerNo);
+        customer.SetRecFilter();
+
+        if (FilterNodes.Count() >= 1) then begin
+            ExchRateDate := Today();
+            GLSetup.Get();
+            FilterNodes.Get(1, FilteredNode);
+            if (Currency.Get(Get_TextFromNode(FilteredNode, 'CurrencyCode'))) then begin
+                Currency.SetRecFilter();
+                CurrencyFactor := CurrExchRate.ExchangeRate(ExchRateDate, Currency.Code);
+            end else
+                CurrencyFactor := 1;
+        end;
+
+        if not GetAll then
+            for i := 1 to FilterNodes.Count() do begin
+                FilterNodes.Get(i, FilteredNode);
+                if not item.Get(Get_SingleNodevalue(FilteredNode, 'ProductId')) then
+                    Error(StrSubstNo('item not found %1', Get_SingleNodevalue(FilteredNode, 'ProductId')));
+                Add_ItemCustomer(item, CopyStr(Get_TextFromNode(FilteredNode, 'ProductVariantID'), 1, 30), customer, XMLNewChild);
+            end
+        else
+            if item.FindSet(false, false) then
+                repeat
+                    Add_ItemCustomer(item, '', customer, XMLNewChild);
+                until (item.Next() = 0);
+    end;
+
+    local procedure Add_ItemCustomer(item: Record "Item"; variant: Text[30]; customer: Record "Customer"; var XMLNewChildProd: XmlNode)
+    var
+        SalesHeader: Record "Sales Header";
+        SalesLine: Record "Sales Line";
+        VATPostingSetup: Record "VAT Posting Setup";
+        itemvariants: Record "Item Variant";
+        pricemgt: Codeunit "Price Calculation Mgt.";
+        PriceCalculation: Interface "Price Calculation";
+        XMLElement: XmlElement;
+    begin
+        item."Variant Filter" := CopyStr(variant, 1, 10);
+        item.CalcFields(item.Inventory);
+
+        Add_Element(XMLNewChildProd, 'item', '', '', XMLNewChildProd, '');
+        Add_Attribute(XMLNewChildProd, 'table', 'EcomProducts');
+        Add_Field(XMLNewChildProd, 'ProductID', item."No.");
+        Add_Field(XMLNewChildProd, 'ProductVariantID', variant);
+        Add_Field(XMLNewChildProd, 'ProductNumber', item."No.");
+
+        if (variant = '') then
+            Add_Field(XMLNewChildProd, 'ProductName', item.Description)
+        else begin
+            Clear(itemVariants);
+            itemVariants.SetRange("Item No.", item."No.");
+            itemVariants.SetRange(Code, variant);
+            if itemVariants.FindFirst() then
+                Add_Field(XMLNewChildProd, 'ProductName', itemvariants.Description)
+            else
+                Error(StrSubstNo('item variant not found %1 %2'), item."No.", variant);
+        end;
+
+        VATPostingSetup.Get(customer."VAT Bus. Posting Group", item."VAT Prod. Posting Group");
+        AllowLineDisc := customer."Allow Line Disc.";
+        AllowInvDisc := false;
+        Qty := 1;
+        QtyPerUOM := 1;
+        VATCalcType := VATPostingSetup."VAT Calculation Type";
+        PricesInclVAT := customer."Prices Including VAT";
+        VATBusPostingGr := customer."VAT Bus. Posting Group";
+        VATPerCent := VATPostingSetup."VAT %";
+        PricesInCurrency := true;
+
+        //Get Price for Standard Customer Price   
+        GetSalesHeaderLine(SalesHeader, SalesLine, Today(), customer."No.", item."No.", item."Base Unit of Measure", 1, variant, Currency.Code, customer."Customer Price Group", customer."Customer Disc. Group", item."VAT Prod. Posting Group", PricesInclVAT);
+        GetPriceCalculationHandler(SalesHeader, SalesLine, PriceCalculation);
+        PriceCalculation.ApplyDiscount();
+        ApplyPrice(salesline, 15, PriceCalculation);
+
+        Add_Field(XMLNewChildProd, 'ProductPrice', Format(SalesLine."Line Amount"));
+        Add_Field(XMLNewChildProd, 'ProductUOM', Format(SalesLine."Unit of Measure Code"));
+        Add_Field(XMLNewChildProd, 'ProductStock', Format(item.Inventory));
+        Add_Field(XMLNewChildProd, 'ProductCurrencyCode', Currency.Code);
+        XMLNewChildProd.GetParent(XMLElement);
+        XMLNewChildProd := XMLElement.AsXmlNode()
+    end;
+
+    internal procedure GetSalesHeaderLine(var SalesHeader: Record "Sales Header"; var SalesLine: Record "Sales Line"; Period: date; CustomerNo: code[20]; Itemno: code[20]; uom: code[10]; Qty: Decimal; variantCode: code[10]; CurrencyCode: code[10]; CustomerPriceGrp: code[20]; CustomerDiscPriceGrp: code[20]; VatProdPostingGrp: code[10]; pPriceIncVat: Boolean)
+    var
+
+        CurrExchRate: Record "Currency Exchange Rate";
+        CurrencyFactor: Decimal;
+    begin
+        CurrencyFactor := CurrExchRate.ExchangeRate(Period, CurrencyCode);
+        SalesHeader.Init();
+        SalesHeader."Document Type" := SalesHeader."Document Type"::Order;
+        SalesHeader."bIll-to Customer No." := CustomerNo;
+        SalesHeader."Order Date" := Period;
+        SalesHeader."Currency Code" := CurrencyCode;
+        SalesHeader."Currency Factor" := CurrencyFactor;
+        SalesHeader."Prices Including VAT" := pPriceIncVat;
+
+        SalesLine.Init();
+        salesline."Document Type" := SalesHeader."Document Type";
+        SalesLine.Type := SalesLine.Type::Item;
+        SalesLine."No." := itemno;
+        SalesLine."Unit of Measure Code" := uom;
+        SalesLine.Quantity := qty;
+        SalesLine."Qty. per Unit of Measure" := 1;
+        SalesLine."Customer Price Group" := CustomerPriceGrp;
+        SalesLine."Customer Disc. Group" := CustomerDiscPriceGrp;
+        SalesLine."VAT Prod. Posting Group" := VatProdPostingGrp;
+
+    end;
+
+    internal procedure GetPriceCalculationHandler(SalesHeader: Record "Sales Header"; var SalesLine: Record "sales Line"; var PriceCalculation: Interface "Price Calculation")
+    var
+        PriceCalculationMgt: codeunit "Price Calculation Mgt.";
+        SalesLinePrice: Codeunit "Sales Line - Price";
+        PriceType: Enum "Price Type";
+    begin
+        SalesLinePrice.SetLine(PriceType::Sale, SalesHeader, SalesLine);
+        PriceCalculationMgt.GetHandler(SalesLinePrice, PriceCalculation);
+    end;
+
+    internal procedure ApplyPrice(var SalesLine: record "Sales Line"; CalledByFieldNo: Integer; var PriceCalculation: Interface "Price Calculation")
+    begin
+        PriceCalculation.ApplyPrice(CalledByFieldNo);
+        GetLineWithPrice(SalesLine, PriceCalculation);
+    end;
+
+    // [NonDebuggable]
+    internal procedure GetLineWithPrice(var SalesLine: record "Sales Line"; var PriceCalculation: Interface "Price Calculation")
+    var
+        Line: Variant;
+    begin
+        PriceCalculation.GetLine(Line);
+        SalesLine := Line;
+
+    end;
+
+    local procedure Add_EcomSalesPrices(var XMLCurrNode: XmlNode; GetAll: Boolean; CustFilterNodes: XmlNodeList; ItemFilterNodes: XmlNodeList; CustomerNo: Code[20]; SalesCode: Code[20])
+    var
+        PriceListHeader: Record "Price List Header";
+        SalesPrice: Record "Price List Line";
+        TempSalesPrice: Record "Price List Line" temporary;
+        TempSalesPrice1: Record "Price List Line" temporary;
+        TempSalesPrice2: Record "Price List Line" temporary;
+        TempItem: Record "Item" temporary;
+        TempCust: Record "Customer" temporary;
+        item: Record "Item";
+        Customer: Record "Customer";
+        VATPostingSetup: Record "VAT Posting Setup";
+        SalesLineDisc: Record "Price List Line";
+        CustInvDisc: Record "Cust. Invoice Disc.";
+        ItemUOM: Record "Item Unit of Measure";
+        Campaign: Record "Campaign";
+        XMLNewChild: XmlNode;
+        Xmlelement: XmlElement;
+        FilteredNode: XmlNode;
+        i: Integer;
+        FindThisCustItemPrice: Boolean;
+        FindThisCustItemDisc: Boolean;
+        CampaignAdded: Boolean;
+        recordcount: Integer;
+        noofRecords: Integer;
+    begin
+        GetSetup();
+        TempItem.DeleteAll();
         tempCust.DeleteAll();
         tempSalesPrice.DeleteAll();
         Clear(SalesPrice);
+
+        for i := 1 to ItemFilterNodes.Count() do begin
+            ItemFilterNodes.Get(i, FilteredNode);
+            if Get_SingleNodevalue(FilteredNode, 'ProductID') <> '' then begin
+                if not item.Get(Get_SingleNodevalue(FilteredNode, 'ProductID')) then
+                    Error(StrSubstNo('item not found %1', Get_SingleNodevalue(FilteredNode, 'ProductID')));
+                TempItem.Init();
+                TempItem."No." := item."No.";
+                TempItem.Insert();
+            end;
+        end;
+
+        for i := 1 to CustFilterNodes.Count() do begin
+            CustFilterNodes.Get(i, FilteredNode);
+            if Get_SingleNodevalue(FilteredNode, 'ExternalUserID') <> '' then begin
+                if not Customer.Get(Get_SingleNodevalue(FilteredNode, 'ExternalUserID')) then
+                    Error(StrSubstNo('Customer not found %1', Get_SingleNodevalue(FilteredNode, 'ExternalUserID')));
+                TempCust.Init();
+                TempCust."No." := Customer."No.";
+                TempCust.Insert();
+            end;
+        end;
 
         if CustomerNo <> '' then
             if not tempCust.Get(CustomerNo) then begin
@@ -152,9 +383,9 @@ codeunit 50100 HtunWebService
                 Add_Element(XMLNewChild, 'item', '', '', XMLNewChild, '');
                 Add_Attribute(XMLNewChild, 'table', 'EcomSalesPrice');
 
-                Add_Field(XMLNewChild, 'ExternalUserId', tempSalesPrice."Source No.");
+                Add_Field(XMLNewChild, 'ExternalUserID', tempSalesPrice."Source No.");
                 Add_Field(XMLNewChild, 'SalesCode', tempSalesPrice."Price List Code");
-                Add_Field(XMLNewChild, 'ProductId', tempSalesPrice."Asset No.");
+                Add_Field(XMLNewChild, 'ProductID', tempSalesPrice."Asset No.");
                 Add_Field(XMLNewChild, 'ProductName', tempSalesPrice.Description);
                 if tempSalesPrice."Currency Code" = '' then
                     tempSalesPrice."Currency Code" := GLSetup."LCY Code";
@@ -333,7 +564,7 @@ codeunit 50100 HtunWebService
                 CreateContact := false;
                 UseExternaID := false;
 
-                if UpperCase(Get_TextFromNode(XMLNode, 'column[@columnName=''OrderCustomerAccessUserExternalId'']')) <> '' then
+                if UpperCase(Get_TextFromNode(XMLNode, 'column[@columnName=''OrderCustomerAccessUserExternalId'']')) <> 'ANONYMOUS' then
                     Cust.Get(Get_TextFromNode(XMLNode, 'column[@columnName=''OrderCustomerAccessUserExternalId'']'))
                 else
                     if Get_TextFromNode(XMLNode, 'column[@columnName=''OrderCustomerNumber'']') <> '' then begin
@@ -428,7 +659,7 @@ codeunit 50100 HtunWebService
                 salesheader.Validate("Ship-to City", Get_TextFromNode(XMLNode, 'column[@columnName=''OrderDeliveryCity'']'));
                 salesheader."Ship-to Contact" := CopyStr(Get_TextFromNode(XMLNode, 'column[@columnName=''OrderDeliveryName'']'), 1, 100);
 
-                if Currency.GET(Get_TextFromNode(XMLNode, 'column[@columnName=''OrderCurrencyCode'']')) then
+                if Currency.Get(Get_TextFromNode(XMLNode, 'column[@columnName=''OrderCurrencyCode'']')) then
                     salesheader.Validate("Currency Code", Get_TextFromNode(XMLNode, 'column[@columnName=''OrderCurrencyCode'']'));
 
                 if salesheader."Location Code" = '' then
@@ -850,21 +1081,6 @@ codeunit 50100 HtunWebService
         XMLNewChild := XMLElement.AsXmlNode();
     end;
 
-    /// <summary>
-    /// AddDeclaration.
-    /// </summary>
-    /// <param name="pXMLDocument">VAR XmlDocument.</param>
-    /// <param name="pVersion">Text.</param>
-    /// <param name="pEncoding">Text.</param>
-    /// <param name="pStandalone">Text.</param>
-    Local procedure AddDeclaration(var pXMLDocument: XmlDocument; pVersion: Text; pEncoding: Text; pStandalone: Text)
-    var
-        lXmlDeclaration: XmlDeclaration;
-    begin
-        lXmlDeclaration := XmlDeclaration.Create(pVersion, pEncoding, pStandalone);
-        pXMLDocument.SetDeclaration(lXmlDeclaration);
-    end;
-
     local procedure ConvertBigTestToXml(var XMLdoc: XmlDocument; var bigtext: Text)
     begin
         XmlDocument.ReadFrom(bigtext, XMLdoc);
@@ -1031,7 +1247,8 @@ codeunit 50100 HtunWebService
 
     local procedure GetSetup()
     begin
-        if not HasSetup then Setup.GET();
+        if not HasSetup then
+            Setup.Get();
         HasSetup := true;
     end;
 }
