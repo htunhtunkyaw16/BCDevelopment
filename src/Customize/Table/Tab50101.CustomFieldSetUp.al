@@ -8,9 +8,9 @@ table 50101 CustomFieldSetUp
 
     fields
     {
-        field(1; "Primary Key"; Code[10])
+        field(1; "Code"; Code[10])
         {
-            Caption = 'Primary Key';
+            Caption = 'Code';
             DataClassification = ToBeClassified;
         }
         field(2; "External Id"; Code[20])
@@ -40,7 +40,7 @@ table 50101 CustomFieldSetUp
     }
     keys
     {
-        key(PK; "Primary Key")
+        key(PK; Code)
         {
             Clustered = true;
         }

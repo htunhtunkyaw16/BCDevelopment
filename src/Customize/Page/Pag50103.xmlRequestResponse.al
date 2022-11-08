@@ -33,6 +33,7 @@ page 50103 xmlRequestResponse
                 ApplicationArea = All;
                 Caption = 'Get Response';
                 Promoted = true;
+                Image = Process;
                 PromotedCategory = Process;
 
                 trigger OnAction()
@@ -40,6 +41,7 @@ page 50103 xmlRequestResponse
                     webService: Codeunit HtunWebService;
                     response: Text;
                 begin
+                    Clear(webService);
                     response := request;
                     webService.Process(response);
                     Message(response);
